@@ -1,0 +1,27 @@
+.container {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    border-top: 1px solid black;
+    padding: 1rem;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    .connection-indicator {
+        --indicator-size: 13px;
+        height: var(--indicator-size);
+        width: var(--indicator-size);
+        border-radius: 50%;
+        background-color: red;
+        border: solid 1px black;
+
+        &.connected {
+            background-color: green;
+        }
+    }
+
+}

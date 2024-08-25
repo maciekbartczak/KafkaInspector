@@ -1,2 +1,6 @@
 [workspace]
-members = ["crates/ki-tauri"]
+members = ["crates/ki-tauri", "crates/ki-core"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

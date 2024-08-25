@@ -1,16 +1,8 @@
 use tauri::Manager;
 
-#[derive(serde::Deserialize)]
-struct ConnectToClusterParams {
-    address: String,
-}
-
 #[tauri::command]
-fn connect(params: ConnectToClusterParams) -> Result<(), String> {
-    println!("connect to cluster");
-    println!("{}", params.address);
-
-    Err("not implemented".to_string())
+async fn connect(params: ki_core::ConnectToClusterParams) -> Result<(), String> {
+    ki_core::connect(&params)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -1,6 +1,6 @@
 import { Component } from "@angular/core";
 import { FormsModule } from "@angular/forms";
-import { ConnectToClusterService } from "../../services/connect-to-cluster.service";
+import { invoke } from "@tauri-apps/api/core";
 
 @Component({
   selector: "app-connect-to-cluster",
@@ -12,9 +12,13 @@ import { ConnectToClusterService } from "../../services/connect-to-cluster.servi
 export class ConnectToClusterComponent {
   clusterAddress: string = "localhost:9092";
 
-  constructor(private connectService: ConnectToClusterService) {}
-
   connect(): void {
-    this.connectService.connectToCluster({ address: this.clusterAddress });
+    invoke<boolean>("connect", { params: { address: this.clusterAddress } })
+      .then(() => {
+        console.log("connected successfully");
+      })
+      .catch((err) => {
+        console.error(`error while connecting to cluster: ${err}`);
+      });
   }
 }

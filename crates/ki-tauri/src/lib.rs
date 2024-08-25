@@ -1,18 +1,26 @@
+use tauri::Manager;
+
 #[derive(serde::Deserialize)]
 struct ConnectToClusterParams {
     address: String,
 }
 
 #[tauri::command]
-fn connect(params: ConnectToClusterParams) -> bool {
+fn connect(params: ConnectToClusterParams) -> Result<(), String> {
     println!("connect to cluster");
     println!("{}", params.address);
-    true
+
+    Err("not implemented".to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(debug_assertions)]
+            app.get_webview_window("main").unwrap().open_devtools();
+            Ok(())
+        })
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![connect])
         .run(tauri::generate_context!())

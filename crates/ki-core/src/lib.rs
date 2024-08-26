@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use log::info;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     ClientConfig,
@@ -7,12 +8,10 @@ use rdkafka::{
 
 #[derive(serde::Deserialize)]
 pub struct ConnectToClusterParams {
-    address: String,
+    pub address: String,
 }
 
 pub fn connect(params: &ConnectToClusterParams) -> Result<(), String> {
-    println!("connect to cluster started");
-
     let consumer: BaseConsumer = ClientConfig::new()
         .set("bootstrap.servers", &params.address)
         .create()
@@ -22,9 +21,9 @@ pub fn connect(params: &ConnectToClusterParams) -> Result<(), String> {
         .fetch_metadata(None, Duration::from_secs(5))
         .map_err(|e| format!("failed to fetch metadata: {}", e))?;
 
-    println!("Topics:");
+    info!("Topics:");
     for topic in metadata.topics() {
-        println!(
+        info!(
             "Name: {}, partitions: {}",
             topic.name(),
             topic.partitions().len()

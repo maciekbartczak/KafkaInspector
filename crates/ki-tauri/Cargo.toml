@@ -16,6 +16,8 @@ tauri-build = { version = "2.0.0-rc", features = [] }
 ki-core = { path = "../ki-core" }
 tauri = { version = "2.0.0-rc", features = [] }
 tauri-plugin-shell = "2.0.0-rc"
+tauri-plugin-log = "2.0.0-rc"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { version = "1.39.3", features = ["rt"] }
+log = { workspace = true }

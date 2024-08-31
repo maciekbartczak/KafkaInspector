@@ -13,6 +13,7 @@ export class ConnectToClusterComponent {
   clusterAddress: string = "localhost:9092";
 
   connect(): void {
+    console.log("connecting to cluster");
     invoke<boolean>("connect", { params: { address: this.clusterAddress } })
       .then(() => {
         console.log("connected successfully");

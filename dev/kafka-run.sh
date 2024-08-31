@@ -1,1 +1,1 @@
-docker compose -f ./docker/docker-compose-kafka.yaml up
+docker compose -f "$(dirname "$0")"/./docker/docker-compose-kafka.yaml up

@@ -1,11 +1,19 @@
-use log::info;
 use tauri::Manager;
 use tauri_plugin_log::Target;
 
 #[tauri::command]
 async fn connect(params: ki_core::ConnectToClusterParams) -> Result<(), String> {
-    info!("connectToCluster started, address: {}", params.address);
-    ki_core::connect(&params)
+    let handle = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+
+        loop {
+            interval.tick().await;
+
+            ki_core::connect(&params)?;
+        }
+    });
+
+    handle.await.unwrap()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -21,6 +29,7 @@ pub fn run() {
             tauri_plugin_log::Builder::new()
                 .clear_targets()
                 .target(Target::new(tauri_plugin_log::TargetKind::Stdout))
+                .target(Target::new(tauri_plugin_log::TargetKind::Stderr))
                 .level(log::LevelFilter::Debug)
                 .build(),
         )

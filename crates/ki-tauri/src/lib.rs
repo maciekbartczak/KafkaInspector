@@ -1,4 +1,3 @@
-use log::debug;
 use tauri::Manager;
 use tauri::State;
 use tauri_plugin_log::Target;
@@ -11,6 +10,7 @@ enum AppMessage {
         ki_core::ConnectToClusterParams,
         oneshot::Sender<Result<(), String>>,
     ),
+    RemoveMetadataFetcher,
 }
 
 struct AppState {
@@ -39,7 +39,7 @@ async fn connect(
         .message_sender
         .send(AppMessage::SpawnMetadataFetcher(params, sender))
         .await
-        .map_err(|e| e.to_string());
+        .map_err(|e| format!("failed to send message: {}", e))?;
 
     receiver.await.unwrap()
 }
@@ -48,28 +48,42 @@ async fn connect(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     let (sender, mut receiver) = mpsc::channel(100);
-    let state = AppState::new(sender);
+    let state = AppState::new(sender.clone());
 
     let mut internal_state = InternalState {
         metadata_fetcher_handle: None,
     };
 
+    // main loop that handles all app state changes
     tokio::spawn(async move {
         while let Some(message) = receiver.recv().await {
             match message {
-                AppMessage::SpawnMetadataFetcher(params, sender) => {
-                    debug!("Spawning metadata fetcher");
+                AppMessage::SpawnMetadataFetcher(params, result_sender) => {
+                    if let Some(_) = internal_state.metadata_fetcher_handle {
+                        result_sender
+                            .send(Err("Metadata fetcher already running".to_string()))
+                            .unwrap();
+                        continue;
+                    }
+
+                    let sender = sender.clone();
+
                     let handle = tokio::spawn(async move {
                         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
 
                         match ki_core::connect(&params) {
-                            Ok(_) => sender.send(Ok(())),
+                            Ok(_) => {
+                                result_sender.send(Ok(())).unwrap();
+                            }
                             Err(e) => {
-                                sender.send(Err(e.to_string())).unwrap();
+                                sender
+                                    .send(AppMessage::RemoveMetadataFetcher)
+                                    .await
+                                    .unwrap();
+                                result_sender.send(Err(e.to_string())).unwrap();
                                 return;
                             }
-                        }
-                        .unwrap();
+                        };
 
                         loop {
                             interval.tick().await;
@@ -78,6 +92,9 @@ pub async fn run() {
                     });
 
                     internal_state.metadata_fetcher_handle = Some(handle);
+                }
+                AppMessage::RemoveMetadataFetcher => {
+                    internal_state.metadata_fetcher_handle = None;
                 }
             }
         }

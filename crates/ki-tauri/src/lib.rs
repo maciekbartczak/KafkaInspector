@@ -44,6 +44,16 @@ async fn connect(
     receiver.await.unwrap()
 }
 
+#[tauri::command]
+async fn disconnect(state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .message_sender
+        .send(AppMessage::RemoveMetadataFetcher)
+        .await
+        .map_err(|e| format!("failed to send message: {}", e))?;
+    Ok(())
+}
+
 #[tokio::main]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
@@ -94,7 +104,11 @@ pub async fn run() {
                     internal_state.metadata_fetcher_handle = Some(handle);
                 }
                 AppMessage::RemoveMetadataFetcher => {
-                    internal_state.metadata_fetcher_handle = None;
+                    internal_state
+                        .metadata_fetcher_handle
+                        .take()
+                        .unwrap()
+                        .abort();
                 }
             }
         }
@@ -115,7 +129,7 @@ pub async fn run() {
                 .build(),
         )
         .manage(state)
-        .invoke_handler(tauri::generate_handler![connect])
+        .invoke_handler(tauri::generate_handler![connect, disconnect])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

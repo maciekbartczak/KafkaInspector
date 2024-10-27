@@ -1,34 +1,53 @@
 use std::time::Duration;
 
-use log::info;
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     ClientConfig,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(serde::Deserialize, Clone)]
-pub struct ConnectToClusterParams {
+#[derive(Deserialize, Clone)]
+pub struct ConsumerParams {
     pub address: String,
 }
 
-pub fn connect(params: &ConnectToClusterParams) -> Result<(), String> {
-    let consumer: BaseConsumer = ClientConfig::new()
-        .set("bootstrap.servers", &params.address)
-        .create()
-        .map_err(|e| format!("failed to create consumer: {}", e))?;
+pub struct MetadataFetcher {
+    consumer: BaseConsumer,
+}
 
-    let metadata = consumer
-        .fetch_metadata(None, Duration::from_secs(5))
-        .map_err(|e| format!("failed to fetch metadata: {}", e))?;
+#[derive(Serialize, Clone)]
+pub struct Metadata {
+    topics: Vec<Topic>
+}
 
-    info!("Topics:");
-    for topic in metadata.topics() {
-        info!(
-            "Name: {}, partitions: {}",
-            topic.name(),
-            topic.partitions().len()
-        );
+#[derive(Serialize, Clone)]
+pub struct Topic {
+    name: String,
+    partitions_count: usize,
+}
+
+impl MetadataFetcher {
+    pub fn new(params: &ConsumerParams) -> Result<Self, String> {
+        let consumer = ClientConfig::new()
+            .set("bootstrap.servers", &params.address)
+            .create()
+            .map_err(|e| format!("failed to create consumer: {}", e))?;
+
+        Ok(Self {
+            consumer
+        })
     }
 
-    Ok(())
+    pub fn fetch_metadata(&self) -> Result<Metadata, String> {
+        let rdkafka_metadata = self.consumer
+            .fetch_metadata(None, Duration::from_secs(5))
+            .map_err(|e| format!("failed to fetch metadata: {}", e))?;
+        
+        Ok(Metadata {
+            topics: rdkafka_metadata.topics().into_iter().map(|t| { Topic {
+                name: t.name().to_string(),
+                partitions_count: t.partitions().len(),
+            }}).collect(),
+        })
+    }
 }

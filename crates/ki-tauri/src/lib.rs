@@ -1,13 +1,16 @@
+use tauri::ipc::Channel;
 use tauri::Manager;
 use tauri::State;
 use tauri_plugin_log::Target;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
+use ki_core::{Metadata, MetadataFetcher};
 
 enum AppMessage {
     SpawnMetadataFetcher(
-        ki_core::ConnectToClusterParams,
+        ki_core::ConsumerParams,
+        Channel<Metadata>,
         oneshot::Sender<Result<(), String>>,
     ),
     RemoveMetadataFetcher,
@@ -18,7 +21,7 @@ struct AppState {
 }
 
 struct InternalState {
-    metadata_fetcher_handle: Option<JoinHandle<()>>,
+    metadata_fetcher_task_handle: Option<JoinHandle<()>>,
 }
 
 impl AppState {
@@ -32,12 +35,13 @@ impl AppState {
 #[tauri::command]
 async fn connect(
     state: State<'_, AppState>,
-    params: ki_core::ConnectToClusterParams,
+    params: ki_core::ConsumerParams,
+    on_event: Channel<Metadata>
 ) -> Result<(), String> {
     let (sender, receiver) = oneshot::channel();
     state
         .message_sender
-        .send(AppMessage::SpawnMetadataFetcher(params, sender))
+        .send(AppMessage::SpawnMetadataFetcher(params, on_event, sender))
         .await
         .map_err(|e| format!("failed to send message: {}", e))?;
 
@@ -61,15 +65,15 @@ pub async fn run() {
     let state = AppState::new(sender.clone());
 
     let mut internal_state = InternalState {
-        metadata_fetcher_handle: None,
+        metadata_fetcher_task_handle: None,
     };
 
     // main loop that handles all app state changes
     tokio::spawn(async move {
         while let Some(message) = receiver.recv().await {
             match message {
-                AppMessage::SpawnMetadataFetcher(params, result_sender) => {
-                    if let Some(_) = internal_state.metadata_fetcher_handle {
+                AppMessage::SpawnMetadataFetcher(params, on_event, result_sender) => {
+                    if let Some(_) = internal_state.metadata_fetcher_task_handle {
                         result_sender
                             .send(Err("Metadata fetcher already running".to_string()))
                             .unwrap();
@@ -79,9 +83,10 @@ pub async fn run() {
                     let sender = sender.clone();
 
                     let handle = tokio::spawn(async move {
+                        let metadata_fetcher = MetadataFetcher::new(&params).unwrap();
                         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
 
-                        match ki_core::connect(&params) {
+                        match metadata_fetcher.fetch_metadata() {
                             Ok(_) => {
                                 result_sender.send(Ok(())).unwrap();
                             }
@@ -97,15 +102,16 @@ pub async fn run() {
 
                         loop {
                             interval.tick().await;
-                            ki_core::connect(&params).unwrap();
+                            let metadata = metadata_fetcher.fetch_metadata().unwrap();
+                            on_event.send(metadata).unwrap()
                         }
                     });
 
-                    internal_state.metadata_fetcher_handle = Some(handle);
+                    internal_state.metadata_fetcher_task_handle = Some(handle);
                 }
                 AppMessage::RemoveMetadataFetcher => {
                     internal_state
-                        .metadata_fetcher_handle
+                        .metadata_fetcher_task_handle
                         .take()
                         .unwrap()
                         .abort();

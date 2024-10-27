@@ -1,19 +1,23 @@
-import { Injectable } from "@angular/core";
-import { BehaviorSubject, Observable, from } from "rxjs";
+import {Injectable} from "@angular/core";
+import {BehaviorSubject, Observable} from "rxjs";
+import {Metadata} from "./types";
 
 @Injectable({
   providedIn: "root",
 })
 export class AppStateService {
   private isConnectedSubject = new BehaviorSubject<boolean>(false);
-  public isConnected$: Observable<boolean> =
-    this.isConnectedSubject.asObservable();
+  private metadataSubject = new BehaviorSubject<Metadata>({topics: []});
 
-  setIsConnected(isConnected: boolean) {
+  public isConnected$: Observable<boolean> = this.isConnectedSubject.asObservable();
+  public metadata$: Observable<Metadata> = this.metadataSubject.asObservable();
+
+  setIsConnected(isConnected: boolean): void {
     this.isConnectedSubject.next(isConnected);
   }
 
-  getIsConnected() {
-    return this.isConnectedSubject.value;
+  setMetadata(metadata: Metadata): void {
+    this.metadataSubject.next(metadata);
   }
+
 }

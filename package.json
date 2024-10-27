@@ -2,7 +2,7 @@
   "name": "kafka-inspector",
   "private": true,
   "scripts": {
-    "dev": "tauri dev",
+    "dev": "WEBKIT_DISABLE_DMABUF_RENDERER=1 tauri dev",
     "start": "pnpm --filter @kafkainspector/ui run start",
     "build": "pnpm --filter @kafkainspector/ui run build",
     "tauri": "tauri"

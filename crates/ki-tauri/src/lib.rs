@@ -1,3 +1,4 @@
+use log::debug;
 use tauri::ipc::Channel;
 use tauri::Manager;
 use tauri::State;
@@ -14,6 +15,8 @@ enum AppMessage {
         oneshot::Sender<Result<(), String>>,
     ),
     RemoveMetadataFetcher,
+    SetLastMetadata(Metadata),
+    GetLastMetadata(oneshot::Sender<Metadata>),
 }
 
 struct AppState {
@@ -22,6 +25,7 @@ struct AppState {
 
 struct InternalState {
     metadata_fetcher_task_handle: Option<JoinHandle<()>>,
+    last_metadata: Metadata,
 }
 
 impl AppState {
@@ -66,6 +70,7 @@ pub async fn run() {
 
     let mut internal_state = InternalState {
         metadata_fetcher_task_handle: None,
+        last_metadata: Metadata::default()
     };
 
     // main loop that handles all app state changes
@@ -87,7 +92,7 @@ pub async fn run() {
                         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
 
                         match metadata_fetcher.fetch_metadata() {
-                            Ok(_) => {
+                            Ok(metadata) => {
                                 result_sender.send(Ok(())).unwrap();
                             }
                             Err(e) => {
@@ -102,8 +107,23 @@ pub async fn run() {
 
                         loop {
                             interval.tick().await;
+
+                            let (result_sender, result_receiver) = oneshot::channel();
+                            sender.send(AppMessage::GetLastMetadata(result_sender))
+                                .await
+                                .unwrap();
+                            let last_metadata = result_receiver.await.unwrap();
+
                             let metadata = metadata_fetcher.fetch_metadata().unwrap();
-                            on_event.send(metadata).unwrap()
+                            if metadata != last_metadata {
+                                debug!("Updating metadata - it differs from the previous update");
+                                sender.send(AppMessage::SetLastMetadata(metadata.clone()))
+                                    .await
+                                    .unwrap();
+                                on_event.send(metadata).unwrap()
+                            } else {
+                                debug!("Metadata update skipped - it does not differ from the previous update")
+                            }
                         }
                     });
 
@@ -115,6 +135,12 @@ pub async fn run() {
                         .take()
                         .unwrap()
                         .abort();
+                }
+                AppMessage::SetLastMetadata(metadata) => {
+                    internal_state.last_metadata = metadata;
+                }
+                AppMessage::GetLastMetadata(result_sender) => {
+                    result_sender.send(internal_state.last_metadata.clone());
                 }
             }
         }

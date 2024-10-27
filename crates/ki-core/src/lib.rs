@@ -15,12 +15,12 @@ pub struct MetadataFetcher {
     consumer: BaseConsumer,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq, Default)]
 pub struct Metadata {
     topics: Vec<Topic>
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, PartialEq)]
 pub struct Topic {
     name: String,
     partitions_count: usize,

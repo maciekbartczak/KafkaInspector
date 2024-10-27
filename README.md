@@ -1,7 +1,8 @@
-# Tauri + Angular
+# KafkaInspector
 
-This template should help get you started developing with Tauri and Angular.
+A simple, lightweight desktop application that displays the most important information about a kafka cluster.
 
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template).
+## Development
+Prerequisites:
+- https://v2.tauri.app/start/prerequisites/
+- cmake - required to build rdkafka

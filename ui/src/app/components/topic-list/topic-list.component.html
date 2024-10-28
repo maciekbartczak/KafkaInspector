@@ -1,4 +1,3 @@
 <h1>topics</h1>
-@for (topic of topics; track topic.name) {
-    {{topic.name}} - {{topic.partitions_count}}<br>
-}
+
+<app-table [tableData]="topics"></app-table>

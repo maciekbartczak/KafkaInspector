@@ -1,0 +1,20 @@
+<table>
+    <thead>
+    <tr>
+        @for (column of columns; track column) {
+            <th>{{ column }}</th>
+        }
+    </tr>
+    </thead>
+    <tbody>
+        @for (row of tableData; track row) {
+            <tr>
+                @for (column of columns; track column) {
+                    <td>
+                        {{ row[column] }}
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>

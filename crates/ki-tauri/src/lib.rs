@@ -110,7 +110,7 @@ pub async fn run() {
                 AppMessage::GetLastMetadata(result_sender) => {
                     result_sender
                         .send(internal_state.last_metadata.clone())
-                        .map_err(|| "failed to send result")
+                        .map_err(|_| "failed to send result")
                         .unwrap();
                 }
             }

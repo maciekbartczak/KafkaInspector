@@ -17,7 +17,7 @@ pub struct MetadataFetcher {
 
 #[derive(Serialize, Clone, PartialEq, Default)]
 pub struct Metadata {
-    topics: Vec<Topic>
+    topics: Vec<Topic>,
 }
 
 #[derive(Serialize, Clone, PartialEq)]
@@ -33,21 +33,24 @@ impl MetadataFetcher {
             .create()
             .map_err(|e| format!("failed to create consumer: {}", e))?;
 
-        Ok(Self {
-            consumer
-        })
+        Ok(Self { consumer })
     }
 
     pub fn fetch_metadata(&self) -> Result<Metadata, String> {
-        let rdkafka_metadata = self.consumer
+        let rdkafka_metadata = self
+            .consumer
             .fetch_metadata(None, Duration::from_secs(5))
             .map_err(|e| format!("failed to fetch metadata: {}", e))?;
-        
+
         Ok(Metadata {
-            topics: rdkafka_metadata.topics().into_iter().map(|t| { Topic {
-                name: t.name().to_string(),
-                partitions_count: t.partitions().len(),
-            }}).collect(),
+            topics: rdkafka_metadata
+                .topics()
+                .into_iter()
+                .map(|t| Topic {
+                    name: t.name().to_string(),
+                    partitions_count: t.partitions().len(),
+                })
+                .collect(),
         })
     }
 }

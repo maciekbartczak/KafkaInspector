@@ -1,4 +1,5 @@
-use log::debug;
+use crate::tasks::metadata_fetcher_task;
+use ki_core::Metadata;
 use tauri::ipc::Channel;
 use tauri::Manager;
 use tauri::State;
@@ -6,7 +7,8 @@ use tauri_plugin_log::Target;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use ki_core::{Metadata, MetadataFetcher};
+
+mod tasks;
 
 enum AppMessage {
     SpawnMetadataFetcher(
@@ -40,7 +42,7 @@ impl AppState {
 async fn connect(
     state: State<'_, AppState>,
     params: ki_core::ConsumerParams,
-    on_event: Channel<Metadata>
+    on_event: Channel<Metadata>,
 ) -> Result<(), String> {
     let (sender, receiver) = oneshot::channel();
     state
@@ -70,7 +72,7 @@ pub async fn run() {
 
     let mut internal_state = InternalState {
         metadata_fetcher_task_handle: None,
-        last_metadata: Metadata::default()
+        last_metadata: Metadata::default(),
     };
 
     // main loop that handles all app state changes
@@ -86,46 +88,12 @@ pub async fn run() {
                     }
 
                     let sender = sender.clone();
-
-                    let handle = tokio::spawn(async move {
-                        let metadata_fetcher = MetadataFetcher::new(&params).unwrap();
-                        let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
-
-                        match metadata_fetcher.fetch_metadata() {
-                            Ok(metadata) => {
-                                result_sender.send(Ok(())).unwrap();
-                            }
-                            Err(e) => {
-                                sender
-                                    .send(AppMessage::RemoveMetadataFetcher)
-                                    .await
-                                    .unwrap();
-                                result_sender.send(Err(e.to_string())).unwrap();
-                                return;
-                            }
-                        };
-
-                        loop {
-                            interval.tick().await;
-
-                            let (result_sender, result_receiver) = oneshot::channel();
-                            sender.send(AppMessage::GetLastMetadata(result_sender))
-                                .await
-                                .unwrap();
-                            let last_metadata = result_receiver.await.unwrap();
-
-                            let metadata = metadata_fetcher.fetch_metadata().unwrap();
-                            if metadata != last_metadata {
-                                debug!("Updating metadata - it differs from the previous update");
-                                sender.send(AppMessage::SetLastMetadata(metadata.clone()))
-                                    .await
-                                    .unwrap();
-                                on_event.send(metadata).unwrap()
-                            } else {
-                                debug!("Metadata update skipped - it does not differ from the previous update")
-                            }
-                        }
-                    });
+                    let handle = tokio::spawn(metadata_fetcher_task(
+                        params,
+                        on_event,
+                        sender,
+                        result_sender,
+                    ));
 
                     internal_state.metadata_fetcher_task_handle = Some(handle);
                 }
@@ -140,7 +108,10 @@ pub async fn run() {
                     internal_state.last_metadata = metadata;
                 }
                 AppMessage::GetLastMetadata(result_sender) => {
-                    result_sender.send(internal_state.last_metadata.clone());
+                    result_sender
+                        .send(internal_state.last_metadata.clone())
+                        .map_err(|| "failed to send result")
+                        .unwrap();
                 }
             }
         }

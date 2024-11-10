@@ -1,28 +1,30 @@
 use crate::tasks::metadata_fetcher_task;
-use ki_core::Metadata;
+use ki_core::{ConsumerParams, Metadata};
 use tauri::ipc::Channel;
 use tauri::Manager;
 use tauri::State;
 use tauri_plugin_log::Target;
-use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 
 mod tasks;
 
 enum AppMessage {
     SpawnMetadataFetcher(
-        ki_core::ConsumerParams,
+        ConsumerParams,
         Channel<Metadata>,
         oneshot::Sender<Result<(), String>>,
     ),
     RemoveMetadataFetcher,
     SetLastMetadata(Metadata),
     GetLastMetadata(oneshot::Sender<Metadata>),
+    GetIsConnected(oneshot::Sender<bool>),
 }
 
 struct AppState {
     message_sender: mpsc::Sender<AppMessage>,
+    last_connection_params: Option<ConsumerParams>,
 }
 
 struct InternalState {
@@ -34,28 +36,88 @@ impl AppState {
     fn new(sender: mpsc::Sender<AppMessage>) -> Self {
         Self {
             message_sender: sender,
+            last_connection_params: None,
         }
     }
 }
 
 #[tauri::command]
 async fn connect(
-    state: State<'_, AppState>,
-    params: ki_core::ConsumerParams,
+    state: State<'_, Mutex<AppState>>,
+    params: ConsumerParams,
     on_event: Channel<Metadata>,
 ) -> Result<(), String> {
+    let mut state = state.lock().await;
+
     let (sender, receiver) = oneshot::channel();
     state
         .message_sender
-        .send(AppMessage::SpawnMetadataFetcher(params, on_event, sender))
+        .send(AppMessage::SpawnMetadataFetcher(
+            params.clone(),
+            on_event,
+            sender,
+        ))
         .await
         .map_err(|e| format!("failed to send message: {}", e))?;
 
-    receiver.await.unwrap()
+    receiver.await.unwrap()?;
+
+    state.last_connection_params = Some(params);
+    Ok(())
 }
 
 #[tauri::command]
-async fn disconnect(state: State<'_, AppState>) -> Result<(), String> {
+async fn reconnect_if_possible(
+    state: State<'_, Mutex<AppState>>,
+    metadata_channel: Channel<Metadata>,
+) -> Result<Option<Metadata>, String> {
+    let state = state.lock().await;
+
+    let (sender, receiver) = oneshot::channel();
+    state
+        .message_sender
+        .send(AppMessage::GetIsConnected(sender))
+        .await
+        .map_err(|e| format!("failed to send message: {}", e))?;
+    let is_connected = receiver.await.unwrap();
+
+    if !is_connected {
+        return Ok(None);
+    }
+
+    state
+        .message_sender
+        .send(AppMessage::RemoveMetadataFetcher)
+        .await
+        .map_err(|e| format!("failed to send message: {}", e))?;
+
+    let (sender, receiver) = oneshot::channel();
+    state
+        .message_sender
+        .send(AppMessage::SpawnMetadataFetcher(
+            state.last_connection_params.clone().unwrap(),
+            metadata_channel,
+            sender,
+        ))
+        .await
+        .map_err(|e| format!("failed to send message: {}", e))?;
+    receiver.await.unwrap()?;
+
+    let (sender, receiver) = oneshot::channel();
+    state
+        .message_sender
+        .send(AppMessage::GetLastMetadata(sender))
+        .await
+        .map_err(|e| format!("failed to send message: {}", e))?;
+    let metadata = receiver.await.unwrap();
+
+    Ok(Some(metadata))
+}
+
+#[tauri::command]
+async fn disconnect(state: State<'_, Mutex<AppState>>) -> Result<(), String> {
+    let state = state.lock().await;
+
     state
         .message_sender
         .send(AppMessage::RemoveMetadataFetcher)
@@ -113,6 +175,12 @@ pub async fn run() {
                         .map_err(|_| "failed to send result")
                         .unwrap();
                 }
+                AppMessage::GetIsConnected(result_sender) => {
+                    result_sender
+                        .send(internal_state.metadata_fetcher_task_handle.is_some())
+                        .map_err(|_| "failed to send result")
+                        .unwrap();
+                }
             }
         }
     });
@@ -131,8 +199,12 @@ pub async fn run() {
                 .level(log::LevelFilter::Debug)
                 .build(),
         )
-        .manage(state)
-        .invoke_handler(tauri::generate_handler![connect, disconnect])
+        .manage(Mutex::new(state))
+        .invoke_handler(tauri::generate_handler![
+            connect,
+            disconnect,
+            reconnect_if_connected
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

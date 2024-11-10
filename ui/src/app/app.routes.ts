@@ -1,19 +1,21 @@
-import { Routes } from "@angular/router";
-import { ConnectToClusterComponent } from "./components/connect-to-cluster/connect-to-cluster.component";
+import {Routes} from "@angular/router";
+import {ConnectToClusterComponent} from "./components/connect-to-cluster/connect-to-cluster.component";
 import {TopicListComponent} from "./components/topic-list/topic-list.component";
+import {reconnectGuard} from "./reconnect.guard";
 
 export const routes: Routes = [
     {
         path: '',
-        pathMatch: 'full',
-        redirectTo: 'connect'
+        canActivate: [reconnectGuard],
+        children: [
+            {
+                path: 'connect',
+                component: ConnectToClusterComponent
+            },
+            {
+                path: 'topics',
+                component: TopicListComponent
+            }
+        ]
     },
-    {
-        path: 'connect',
-        component: ConnectToClusterComponent
-    },
-    {
-        path: 'topics',
-        component: TopicListComponent
-    }
 ];

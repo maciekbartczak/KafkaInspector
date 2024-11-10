@@ -5,7 +5,7 @@ interface TableData {
 }
 
 @Component({
-    selector: 'app-table',
+    selector: 'ki-table',
     standalone: true,
     imports: [],
     templateUrl: './table.component.html',
@@ -13,7 +13,7 @@ interface TableData {
 })
 export class TableComponent implements OnInit {
     ngOnInit(): void {
-        this.columns = Object.keys(this.tableData[0]);
+        this.columns = Object.keys(this.tableData[0] ?? {});
     }
 
     @Input({required: true})

@@ -9,6 +9,7 @@ type Metadata = any;
 })
 export class AppChannelsService {
     public metadataUpdatedChannel = new Channel<Metadata>();
+
     constructor(private state: AppStateService) {
         this.metadataUpdatedChannel.onmessage = (metadata: Metadata) => {
             console.log('Metadata update event received', metadata);

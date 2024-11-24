@@ -203,7 +203,7 @@ pub async fn run() {
         .invoke_handler(tauri::generate_handler![
             connect,
             disconnect,
-            reconnect_if_connected
+            reconnect_if_possible
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,7 @@
 body {
     height: 100vh;
+    font-family: "monospace";
+    cursor: default;
 }
 
 /* Reset css https://www.joshwcomeau.com/css/custom-css-reset/ */

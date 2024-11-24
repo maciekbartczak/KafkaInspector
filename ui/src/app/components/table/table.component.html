@@ -1,10 +1,13 @@
 <table>
     <thead>
-    <tr>
-        @for (column of columns; track column) {
-            <th>{{ column }}</th>
-        }
-    </tr>
+        <tr>
+            @for (column of columns; track column) {
+                <th (click)="sortBy(column)">
+                    {{ makeColumnName(column) }}
+                    <span class="sort-icon">{{ getSortIcon(column) }}</span>
+                </th>
+            }
+        </tr>
     </thead>
     <tbody>
         @for (row of tableData; track row) {

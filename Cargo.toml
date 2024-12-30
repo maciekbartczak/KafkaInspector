@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ki-tauri", "crates/ki-core"]
+members = ["crates/ki-tauri", "crates/ki-core", "crates/ki-egui"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -1,9 +1,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(rustdoc::missing_crate_level_docs)] // it's an example
 
+use std::sync::mpsc::Sender;
+
 use eframe::egui;
+use ki_core::rt::Command;
 
 fn main() -> eframe::Result {
+    env_logger::init();
+
+    let command_tx = ki_core::rt::spawn();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
@@ -15,7 +22,11 @@ fn main() -> eframe::Result {
             // This gives us image support:
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            Ok(Box::<MyApp>::default())
+            Ok(Box::new(MyApp {
+                name: "Arthur".to_owned(),
+                age: 42,
+                command_tx,
+            }))
         }),
     )
 }
@@ -23,15 +34,7 @@ fn main() -> eframe::Result {
 struct MyApp {
     name: String,
     age: u32,
-}
-
-impl Default for MyApp {
-    fn default() -> Self {
-        Self {
-            name: "Arthur".to_owned(),
-            age: 42,
-        }
-    }
+    command_tx: Sender<Command>,
 }
 
 impl eframe::App for MyApp {
@@ -46,6 +49,9 @@ impl eframe::App for MyApp {
             ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
             if ui.button("Increment").clicked() {
                 self.age += 1;
+                self.command_tx
+                    .send(Command::Greet(self.name.clone()))
+                    .unwrap();
             }
             ui.label(format!("Hello '{}', age {}", self.name, self.age));
         });

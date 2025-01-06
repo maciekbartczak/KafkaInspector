@@ -1,10 +1,11 @@
-use std::time::Duration;
-
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     ClientConfig,
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+pub mod rt;
 
 #[derive(Deserialize, Clone)]
 pub struct ConsumerParams {

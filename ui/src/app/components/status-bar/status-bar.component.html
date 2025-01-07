@@ -1,7 +1,0 @@
-<div class="container">
-    <div class="connection-status">
-        <div class="connection-indicator" [class.connected]="isConnected"></div>
-        <p>Status: {{isConnected ? 'CONNECTED' : 'DISCONNECTED'}}</p>
-    </div>
-    <button *ngIf="isConnected" (click)="disconnect()">Disconnect</button>
-</div>

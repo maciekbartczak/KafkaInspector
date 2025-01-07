@@ -22,38 +22,55 @@ fn main() -> eframe::Result {
             // This gives us image support:
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            Ok(Box::new(MyApp {
-                name: "Arthur".to_owned(),
-                age: 42,
+            Ok(Box::new(KIApp {
                 command_tx,
+                cluster_address: "localhost:29092".to_string(),
+                connected: false,
+                connecting: false,
             }))
         }),
     )
 }
 
-struct MyApp {
-    name: String,
-    age: u32,
+struct KIApp {
     command_tx: Sender<Command>,
+    cluster_address: String,
+    connected: bool,
+    connecting: bool,
 }
 
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("My egui Application");
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Your name: ");
-                ui.text_edit_singleline(&mut self.name)
-                    .labelled_by(name_label.id);
-            });
-            ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-            if ui.button("Increment").clicked() {
-                self.age += 1;
+impl KIApp {
+    fn connect_to_cluster_screen(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            let name_label = ui.label("Cluster address: ");
+            ui.text_edit_singleline(&mut self.cluster_address)
+                .labelled_by(name_label.id);
+        });
+        if self.connecting {
+            ui.spinner();
+        } else {
+            if ui.button("Connect").clicked() {
                 self.command_tx
-                    .send(Command::Greet(self.name.clone()))
+                    .send(Command::Greet(self.cluster_address.clone()))
                     .unwrap();
             }
-            ui.label(format!("Hello '{}', age {}", self.name, self.age));
+            if ui.button("Spawn").clicked() {
+                self.command_tx
+                    .send(Command::SpawnMetadataFetcher(self.cluster_address.clone()))
+                    .unwrap();
+            }
+        }
+    }
+}
+
+impl eframe::App for KIApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Kafka Inspector");
+
+            if !self.connected {
+                self.connect_to_cluster_screen(ui);
+            }
         });
     }
 }

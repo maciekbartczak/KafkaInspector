@@ -1,12 +1,12 @@
-use std::time::Duration;
-
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
     ClientConfig,
 };
-use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
-#[derive(Deserialize, Clone)]
+pub mod rt;
+
+#[derive(Clone)]
 pub struct ConsumerParams {
     pub address: String,
 }
@@ -15,12 +15,12 @@ pub struct MetadataFetcher {
     consumer: BaseConsumer,
 }
 
-#[derive(Serialize, Clone, PartialEq, Default, Debug)]
+#[derive(Clone, PartialEq, Default, Debug)]
 pub struct Metadata {
     topics: Vec<Topic>,
 }
 
-#[derive(Serialize, Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Topic {
     name: String,
     partitions_count: usize,

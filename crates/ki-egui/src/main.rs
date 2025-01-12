@@ -1,29 +1,28 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(rustdoc::missing_crate_level_docs)] // it's an example
 
-use std::sync::mpsc::Sender;
+use std::sync::{mpsc::Sender, Arc, RwLock};
 
 use eframe::egui;
-use ki_core::rt::Command;
+use egui_extras::{Column, TableBuilder};
+use ki_core::rt::{Command, State};
 
 fn main() -> eframe::Result {
     env_logger::init();
 
-    let command_tx = ki_core::rt::spawn();
+    let (command_tx, state) = ki_core::rt::spawn();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
     };
     eframe::run_native(
-        "My egui App",
+        "Kafka Inspector",
         options,
-        Box::new(|cc| {
-            // This gives us image support:
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-
+        Box::new(|_| {
             Ok(Box::new(KIApp {
                 command_tx,
+                state,
                 cluster_address: "localhost:29092".to_string(),
                 connected: false,
                 connecting: false,
@@ -34,6 +33,7 @@ fn main() -> eframe::Result {
 
 struct KIApp {
     command_tx: Sender<Command>,
+    state: Arc<RwLock<State>>,
     cluster_address: String,
     connected: bool,
     connecting: bool,
@@ -58,7 +58,22 @@ impl KIApp {
                 self.command_tx
                     .send(Command::SpawnMetadataFetcher(self.cluster_address.clone()))
                     .unwrap();
+                self.connected = true;
             }
+        }
+    }
+
+    fn topics_table(&mut self, ui: &mut egui::Ui) {
+        match self.state.read().unwrap().metadata.as_ref() {
+            Some(metadata) => {
+                metadata.topics().iter().for_each(|topic| {
+                    ui.horizontal(|ui| {
+                        ui.label(topic.name());
+                        ui.label(format!("{}", topic.partitions().len()));
+                    });
+                });
+            }
+            None => {}
         }
     }
 }
@@ -70,6 +85,9 @@ impl eframe::App for KIApp {
 
             if !self.connected {
                 self.connect_to_cluster_screen(ui);
+            } else {
+                self.topics_table(ui);
+                ctx.request_repaint();
             }
         });
     }

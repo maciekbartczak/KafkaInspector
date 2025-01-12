@@ -36,6 +36,13 @@ impl MetadataFetcher {
         Ok(Self { consumer })
     }
 
+    pub fn fetch_raw(&self) -> Result<rdkafka::metadata::Metadata, String> {
+        Ok(self
+            .consumer
+            .fetch_metadata(None, Duration::from_secs(5))
+            .map_err(|e| format!("failed to fetch metadata: {}", e))?)
+    }
+
     pub fn fetch_metadata(&self) -> Result<Metadata, String> {
         let rdkafka_metadata = self
             .consumer

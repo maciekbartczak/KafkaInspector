@@ -6,10 +6,9 @@ use std::{
     thread,
 };
 
-use rdkafka::metadata::Metadata;
 use tokio::runtime::Runtime;
 
-use crate::{ConsumerParams, MetadataFetcher};
+use crate::{ConsumerParams, Metadata, MetadataFetcher};
 
 pub enum Command {
     Greet(String),
@@ -73,15 +72,23 @@ impl CoreApp {
             loop {
                 interval.tick().await;
 
-                let metadata = Some(metadata_fetcher.fetch_raw().unwrap());
+                let metadata = metadata_fetcher.fetch_metadata().unwrap();
 
-                let mut state = state.write().unwrap();
-                state.metadata = metadata;
-                drop(state);
+                let state_read = state.read().unwrap();
+                if state_read.metadata.is_none()
+                    || *state_read.metadata.as_ref().unwrap() != metadata
+                {
+                    drop(state_read);
 
-                update_tx.send(()).unwrap();
+                    let mut state = state.write().unwrap();
+                    state.metadata = Some(metadata);
+                    drop(state);
 
-                log::info!("md updated");
+                    update_tx.send(()).unwrap();
+                    log::debug!("md updated");
+                } else {
+                    log::debug!("md update skipped - there is no difference since last fetch");
+                }
             }
         });
     }

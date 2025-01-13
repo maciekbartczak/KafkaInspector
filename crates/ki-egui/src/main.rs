@@ -79,7 +79,7 @@ impl KIApp {
                 metadata.topics().iter().for_each(|topic| {
                     ui.horizontal(|ui| {
                         ui.label(topic.name());
-                        ui.label(format!("{}", topic.partitions().len()));
+                        ui.label(format!("{}", topic.partitions().to_string()));
                     });
                 });
             }

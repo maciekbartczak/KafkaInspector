@@ -26,6 +26,22 @@ pub struct Topic {
     partitions_count: usize,
 }
 
+impl Metadata {
+    pub fn topics(&self) -> &Vec<Topic> {
+        &self.topics
+    }
+}
+
+impl Topic {
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn partitions(&self) -> &usize {
+       &self.partitions_count
+    }
+}
+
 impl MetadataFetcher {
     pub fn new(params: &ConsumerParams) -> Result<Self, String> {
         let consumer = ClientConfig::new()
@@ -34,13 +50,6 @@ impl MetadataFetcher {
             .map_err(|e| format!("failed to create consumer: {}", e))?;
 
         Ok(Self { consumer })
-    }
-
-    pub fn fetch_raw(&self) -> Result<rdkafka::metadata::Metadata, String> {
-        Ok(self
-            .consumer
-            .fetch_metadata(None, Duration::from_secs(5))
-            .map_err(|e| format!("failed to fetch metadata: {}", e))?)
     }
 
     pub fn fetch_metadata(&self) -> Result<Metadata, String> {

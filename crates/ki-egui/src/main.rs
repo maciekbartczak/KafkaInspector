@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 #![allow(rustdoc::missing_crate_level_docs)] // it's an example
 
-use std::sync::{mpsc::Sender, Arc, RwLock};
+use std::{
+    sync::{mpsc::Sender, Arc, RwLock},
+    thread,
+};
 
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
@@ -10,7 +13,7 @@ use ki_core::rt::{Command, State};
 fn main() -> eframe::Result {
     env_logger::init();
 
-    let (command_tx, state) = ki_core::rt::spawn();
+    let (command_tx, update_rx, state) = ki_core::rt::spawn();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
@@ -19,7 +22,14 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Kafka Inspector",
         options,
-        Box::new(|_| {
+        Box::new(|cc| {
+            let ctx = cc.egui_ctx.clone();
+            thread::spawn(move || loop {
+                if let Ok(_) = update_rx.recv() {
+                    ctx.request_repaint();
+                }
+            });
+
             Ok(Box::new(KIApp {
                 command_tx,
                 state,
@@ -87,7 +97,6 @@ impl eframe::App for KIApp {
                 self.connect_to_cluster_screen(ui);
             } else {
                 self.topics_table(ui);
-                ctx.request_repaint();
             }
         });
     }

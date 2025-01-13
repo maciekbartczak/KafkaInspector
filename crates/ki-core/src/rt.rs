@@ -1,7 +1,7 @@
 use std::{
     sync::{
         mpsc::{channel, Receiver, Sender},
-        Arc, Mutex, RwLock,
+        Arc, RwLock,
     },
     thread,
 };
@@ -18,6 +18,7 @@ pub enum Command {
 
 struct CoreApp {
     command_rx: Receiver<Command>,
+    update_tx: Sender<()>,
     state: Arc<RwLock<State>>,
 }
 
@@ -32,8 +33,16 @@ impl Default for State {
 }
 
 impl CoreApp {
-    pub fn new(command_rx: Receiver<Command>, state: Arc<RwLock<State>>) -> Self {
-        Self { command_rx, state }
+    pub fn new(
+        command_rx: Receiver<Command>,
+        update_tx: Sender<()>,
+        state: Arc<RwLock<State>>,
+    ) -> Self {
+        Self {
+            command_rx,
+            update_tx,
+            state,
+        }
     }
 
     async fn tick(&self) -> bool {
@@ -58,24 +67,32 @@ impl CoreApp {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
 
         let state = self.state.clone();
+        let update_tx = self.update_tx.clone();
+
         tokio::spawn(async move {
             loop {
                 interval.tick().await;
 
+                let metadata = Some(metadata_fetcher.fetch_raw().unwrap());
+
                 let mut state = state.write().unwrap();
-                state.metadata = Some(metadata_fetcher.fetch_raw().unwrap());
-                log::info!("md updated");
+                state.metadata = metadata;
                 drop(state);
+
+                update_tx.send(()).unwrap();
+
+                log::info!("md updated");
             }
         });
     }
 }
 
 // Spawns the core runtime and returns a sender that can be used to communicate with it
-pub fn spawn() -> (Sender<Command>, Arc<RwLock<State>>) {
+pub fn spawn() -> (Sender<Command>, Receiver<()>, Arc<RwLock<State>>) {
     let rt = Runtime::new().expect("unable to create tokio rt");
 
-    let (tx, rx) = channel();
+    let (command_tx, command_rx) = channel();
+    let (update_tx, update_rx) = channel();
     let state = Arc::new(RwLock::new(State::default()));
     let state_clone = state.clone();
 
@@ -83,7 +100,7 @@ pub fn spawn() -> (Sender<Command>, Arc<RwLock<State>>) {
         .name("ki_core_rt".to_owned())
         .spawn(move || {
             log::info!("core rt starting");
-            let core_app = CoreApp::new(rx, state_clone);
+            let core_app = CoreApp::new(command_rx, update_tx, state_clone);
 
             let mut is_running = true;
             rt.block_on(async {
@@ -95,5 +112,5 @@ pub fn spawn() -> (Sender<Command>, Arc<RwLock<State>>) {
             log::info!("core rt exitting");
         });
 
-    (tx, state)
+    (command_tx, update_rx, state)
 }

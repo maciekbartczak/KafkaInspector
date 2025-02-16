@@ -24,6 +24,9 @@ pub struct Metadata {
 pub struct Topic {
     name: String,
     partitions_count: usize,
+    messages_count: usize,
+    last_message_timestamp: Option<i64>,
+    size: usize,
 }
 
 impl Metadata {
@@ -38,7 +41,19 @@ impl Topic {
     }
 
     pub fn partitions(&self) -> &usize {
-       &self.partitions_count
+        &self.partitions_count
+    }
+
+    pub fn messages_count(&self) -> &usize {
+        &self.messages_count
+    }
+
+    pub fn last_message_timestamp(&self) -> &Option<i64> {
+        &self.last_message_timestamp
+    }
+
+    pub fn size(&self) -> &usize {
+        &self.size
     }
 }
 
@@ -65,6 +80,9 @@ impl MetadataFetcher {
                 .map(|t| Topic {
                     name: t.name().to_string(),
                     partitions_count: t.partitions().len(),
+                    messages_count: 0,
+                    last_message_timestamp: None,
+                    size: 0,
                 })
                 .collect(),
         })

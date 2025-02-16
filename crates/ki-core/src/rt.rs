@@ -87,7 +87,7 @@ impl CoreApp {
                     update_tx.send(()).unwrap();
                     log::debug!("md updated");
                 } else {
-                    log::debug!("md update skipped - there is no difference since last fetch");
+                    log::trace!("md update skipped - there is no difference since last fetch");
                 }
             }
         });
